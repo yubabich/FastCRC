@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net40;netstandard2.0;netcoreapp2.1</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Soft160.Data.Cryptography</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Soft160.Data.Cryptography</AssemblyName>
+    <PackageId>CRC.Fast.Net</PackageId>
+    <Authors>Yuri Babich</Authors>
+    <Product>Fast CRC dotnet Library</Product>
+    <Description>Really fast CRC implementation.
+It's faster than popular CRC Nuget packages 1.5-20 times</Description>
+    <Copyright>Yuri Babich</Copyright>
+    <PackageProjectUrl>https://github.com/yubabich/FastCRC</PackageProjectUrl>
+    <PackageTags>CRC, CRC32, Fast CRC</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>0.9.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net40' ">
+    <Reference Include="mscorlib" />
+  </ItemGroup>
+
+</Project>
