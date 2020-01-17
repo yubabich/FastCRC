@@ -1,4 +1,8 @@
-﻿using System;
+﻿#if (NETCOREAPP3_1 || NETCOREAPP3_0 || NETCOREAPP2_2 || NETCOREAPP2_1 || NETSTANDARD2_1)
+#define MEMORY_SPAN
+#endif
+
+using System;
 
 namespace Soft160.Data.Cryptography
 {
@@ -12,24 +16,33 @@ namespace Soft160.Data.Cryptography
     /// </summary>
     public class CRC
     {
-        private static readonly Func<byte[], int, int, uint, uint> ALGORITHM_FUNCTION;
 
-        static CRC()
+#if (MEMORY_SPAN)
+        public static uint Crc32(ReadOnlyMemory<byte> data, uint previousCrc32 = 0)
         {
-            if (BitConverter.IsLittleEndian)
+            using (var memHandle = data.Pin())
             {
-                ALGORITHM_FUNCTION = Crc32LittleEndian;
-            }
-            else
-            {
-                ALGORITHM_FUNCTION = Crc32BigEndian;
+                unsafe
+                {
+                    byte* dataPtr = (byte*)(memHandle.Pointer);
+                    return Crc32(dataPtr, data.Length, previousCrc32);
+                }
             }
         }
 
-        public static uint Crc32(byte[] data, uint previousCrc32 = 0)
+        public static uint Crc32(ReadOnlySpan<byte> data, uint previousCrc32 = 0)
         {
-            return Crc32(data, 0, data.Length, previousCrc32);
+            unsafe
+            {
+                fixed (byte* dataPtr = data)
+                {
+                    return Crc32(dataPtr, data.Length, previousCrc32);
+                }
+            }
         }
+#endif
+
+        public static uint Crc32(byte[] data, uint previousCrc32 = 0) => Crc32(data, 0, data.Length, previousCrc32);
 
         public static uint Crc32(byte[] data, int offset, int count, uint previousCrc32 = 0)
         {
@@ -46,145 +59,148 @@ namespace Soft160.Data.Cryptography
                 throw new ArgumentException();
             }
 
-            return ALGORITHM_FUNCTION.Invoke(data, offset, count, previousCrc32);
+            unsafe
+            {
+                fixed (byte* dataPtr = data)
+                {
+                    return Crc32(dataPtr + offset, count, previousCrc32);
+                }
+            }
         }
 
-        private static uint Crc32LittleEndian(byte[] data, int offset, int count, uint previousCrc32)
+        private unsafe static uint Crc32(byte* dataPtr, int count, uint previousCrc32)
+        {
+            return BitConverter.IsLittleEndian ?
+                Crc32LittleEndian(dataPtr, count, previousCrc32)
+                : Crc32BigEndian(dataPtr, count, previousCrc32);
+        }
+
+        private unsafe static uint Crc32LittleEndian(byte* dataPtr, int count, uint previousCrc32)
         {
             uint crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
             int unroll = 4;
             int bytesAtOnce = 16 * unroll;
 
-            unsafe
+            fixed (uint* lookup_0 = Crc32Lookup)
             {
-                fixed (byte* dataPtr = data)
-                fixed (uint* lookup_0 = Crc32Lookup)
+                uint* uintPtr = (uint*)dataPtr;
+                uint* uintEndPtr = uintPtr + (count / bytesAtOnce) * (bytesAtOnce / 4);
+
+                uint* lookup_1 = lookup_0 + 0x100;
+                uint* lookup_2 = lookup_0 + 0x200;
+                uint* lookup_3 = lookup_0 + 0x300;
+                uint* lookup_4 = lookup_0 + 0x400;
+                uint* lookup_5 = lookup_0 + 0x500;
+                uint* lookup_6 = lookup_0 + 0x600;
+                uint* lookup_7 = lookup_0 + 0x700;
+                uint* lookup_8 = lookup_0 + 0x800;
+                uint* lookup_9 = lookup_0 + 0x900;
+                uint* lookup_10 = lookup_0 + 0xA00;
+                uint* lookup_11 = lookup_0 + 0xB00;
+                uint* lookup_12 = lookup_0 + 0xC00;
+                uint* lookup_13 = lookup_0 + 0xD00;
+                uint* lookup_14 = lookup_0 + 0xE00;
+                uint* lookup_15 = lookup_0 + 0xF00;
+
+                while (uintPtr < uintEndPtr)
                 {
-                    byte* bytePtr = dataPtr + offset;
-                    uint* uintPtr = (uint*)bytePtr;
-                    uint* uintEndPtr = uintPtr + (count / bytesAtOnce) * (bytesAtOnce / 4);
-
-                    uint* lookup_1 = lookup_0 + 0x100;
-                    uint* lookup_2 = lookup_0 + 0x200;
-                    uint* lookup_3 = lookup_0 + 0x300;
-                    uint* lookup_4 = lookup_0 + 0x400;
-                    uint* lookup_5 = lookup_0 + 0x500;
-                    uint* lookup_6 = lookup_0 + 0x600;
-                    uint* lookup_7 = lookup_0 + 0x700;
-                    uint* lookup_8 = lookup_0 + 0x800;
-                    uint* lookup_9 = lookup_0 + 0x900;
-                    uint* lookup_10 = lookup_0 + 0xA00;
-                    uint* lookup_11 = lookup_0 + 0xB00;
-                    uint* lookup_12 = lookup_0 + 0xC00;
-                    uint* lookup_13 = lookup_0 + 0xD00;
-                    uint* lookup_14 = lookup_0 + 0xE00;
-                    uint* lookup_15 = lookup_0 + 0xF00;
-
-                    while (uintPtr < uintEndPtr)
+                    for (int unrolling = 0; unrolling < unroll; ++unrolling)
                     {
-                        for (int unrolling = 0; unrolling < unroll; ++unrolling)
-                        {
-                            //Little endian
-                            uint one = *uintPtr++ ^ crc;
-                            uint two = *uintPtr++;
-                            uint three = *uintPtr++;
-                            uint four = *uintPtr++;
-                            crc = lookup_0[(four >> 24) & 0xFF] ^
-                                lookup_1[(four >> 16) & 0xFF] ^
-                                lookup_2[(four >> 8) & 0xFF] ^
-                                lookup_3[four & 0xFF] ^
-                                lookup_4[(three >> 24) & 0xFF] ^
-                                lookup_5[(three >> 16) & 0xFF] ^
-                                lookup_6[(three >> 8) & 0xFF] ^
-                                lookup_7[three & 0xFF] ^
-                                lookup_8[(two >> 24) & 0xFF] ^
-                                lookup_9[(two >> 16) & 0xFF] ^
-                                lookup_10[(two >> 8) & 0xFF] ^
-                                lookup_11[two & 0xFF] ^
-                                lookup_12[(one >> 24) & 0xFF] ^
-                                lookup_13[(one >> 16) & 0xFF] ^
-                                lookup_14[(one >> 8) & 0xFF] ^
-                                lookup_15[one & 0xFF];
-                        }
+                        //Little endian
+                        uint one = *uintPtr++ ^ crc;
+                        uint two = *uintPtr++;
+                        uint three = *uintPtr++;
+                        uint four = *uintPtr++;
+                        crc = lookup_0[(four >> 24) & 0xFF] ^
+                            lookup_1[(four >> 16) & 0xFF] ^
+                            lookup_2[(four >> 8) & 0xFF] ^
+                            lookup_3[four & 0xFF] ^
+                            lookup_4[(three >> 24) & 0xFF] ^
+                            lookup_5[(three >> 16) & 0xFF] ^
+                            lookup_6[(three >> 8) & 0xFF] ^
+                            lookup_7[three & 0xFF] ^
+                            lookup_8[(two >> 24) & 0xFF] ^
+                            lookup_9[(two >> 16) & 0xFF] ^
+                            lookup_10[(two >> 8) & 0xFF] ^
+                            lookup_11[two & 0xFF] ^
+                            lookup_12[(one >> 24) & 0xFF] ^
+                            lookup_13[(one >> 16) & 0xFF] ^
+                            lookup_14[(one >> 8) & 0xFF] ^
+                            lookup_15[one & 0xFF];
                     }
+                }
 
-                    // remaining 1 to 63 bytes (standard algorithm)
-                    int restBytes = count % bytesAtOnce;
-                    for (int i = (count / bytesAtOnce) * bytesAtOnce; i < count;)
-                    {
-                        crc = (crc >> 8) ^ *(lookup_0 + ((crc & 0xFF) ^ bytePtr[i++]));
-                    }
+                // remaining 1 to 63 bytes (standard algorithm)
+                int restBytes = count % bytesAtOnce;
+                for (int i = (count / bytesAtOnce) * bytesAtOnce; i < count;)
+                {
+                    crc = (crc >> 8) ^ *(lookup_0 + ((crc & 0xFF) ^ dataPtr[i++]));
                 }
             }
 
             return ~crc; // same as crc ^ 0xFFFFFFFF
         }
 
-        private static uint Crc32BigEndian(byte[] data, int offset, int count, uint previousCrc32)
+        private unsafe static uint Crc32BigEndian(byte* dataPtr, int count, uint previousCrc32)
         {
             uint crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
             int unroll = 4;
             int bytesAtOnce = 16 * unroll;
 
-            unsafe
+            fixed (uint* lookup_0 = Crc32Lookup)
             {
-                fixed (byte* dataPtr = data)
-                fixed (uint* lookup_0 = Crc32Lookup)
+                uint* uintPtr = (uint*)dataPtr;
+                uint* uintEndPtr = uintPtr + (count / bytesAtOnce) * (bytesAtOnce / 4);
+
+                uint* lookup_1 = lookup_0 + 0x100;
+                uint* lookup_2 = lookup_0 + 0x200;
+                uint* lookup_3 = lookup_0 + 0x300;
+                uint* lookup_4 = lookup_0 + 0x400;
+                uint* lookup_5 = lookup_0 + 0x500;
+                uint* lookup_6 = lookup_0 + 0x600;
+                uint* lookup_7 = lookup_0 + 0x700;
+                uint* lookup_8 = lookup_0 + 0x800;
+                uint* lookup_9 = lookup_0 + 0x900;
+                uint* lookup_10 = lookup_0 + 0xA00;
+                uint* lookup_11 = lookup_0 + 0xB00;
+                uint* lookup_12 = lookup_0 + 0xC00;
+                uint* lookup_13 = lookup_0 + 0xD00;
+                uint* lookup_14 = lookup_0 + 0xE00;
+                uint* lookup_15 = lookup_0 + 0xF00;
+
+                while (uintPtr < uintEndPtr)
                 {
-                    byte* bytePtr = dataPtr + offset;
-                    uint* uintPtr = (uint*)bytePtr;
-                    uint* uintEndPtr = uintPtr + (count / bytesAtOnce) * (bytesAtOnce / 4);
-
-                    uint* lookup_1 = lookup_0 + 0x100;
-                    uint* lookup_2 = lookup_0 + 0x200;
-                    uint* lookup_3 = lookup_0 + 0x300;
-                    uint* lookup_4 = lookup_0 + 0x400;
-                    uint* lookup_5 = lookup_0 + 0x500;
-                    uint* lookup_6 = lookup_0 + 0x600;
-                    uint* lookup_7 = lookup_0 + 0x700;
-                    uint* lookup_8 = lookup_0 + 0x800;
-                    uint* lookup_9 = lookup_0 + 0x900;
-                    uint* lookup_10 = lookup_0 + 0xA00;
-                    uint* lookup_11 = lookup_0 + 0xB00;
-                    uint* lookup_12 = lookup_0 + 0xC00;
-                    uint* lookup_13 = lookup_0 + 0xD00;
-                    uint* lookup_14 = lookup_0 + 0xE00;
-                    uint* lookup_15 = lookup_0 + 0xF00;
-
-                    while (uintPtr < uintEndPtr)
+                    for (int unrolling = 0; unrolling < unroll; ++unrolling)
                     {
-                        for (int unrolling = 0; unrolling < unroll; ++unrolling)
-                        {
-                            //Big endian
-                            uint one = *uintPtr++ ^ Swap(crc);
-                            uint two = *uintPtr++;
-                            uint three = *uintPtr++;
-                            uint four = *uintPtr++;
-                            crc = lookup_0[four & 0xFF] ^
-                                lookup_1[(four >> 8) & 0xFF] ^
-                                lookup_2[(four >> 16) & 0xFF] ^
-                                lookup_3[(four >> 24) & 0xFF] ^
-                                lookup_4[three & 0xFF] ^
-                                lookup_5[(three >> 8) & 0xFF] ^
-                                lookup_6[(three >> 16) & 0xFF] ^
-                                lookup_7[(three >> 24) & 0xFF] ^
-                                lookup_8[two & 0xFF] ^
-                                lookup_9[(two >> 8) & 0xFF] ^
-                                lookup_10[(two >> 16) & 0xFF] ^
-                                lookup_11[(two >> 24) & 0xFF] ^
-                                lookup_12[one & 0xFF] ^
-                                lookup_13[(one >> 8) & 0xFF] ^
-                                lookup_14[(one >> 16) & 0xFF] ^
-                                lookup_15[(one >> 24) & 0xFF];
-                        }
+                        //Big endian
+                        uint one = *uintPtr++ ^ Swap(crc);
+                        uint two = *uintPtr++;
+                        uint three = *uintPtr++;
+                        uint four = *uintPtr++;
+                        crc = lookup_0[four & 0xFF] ^
+                            lookup_1[(four >> 8) & 0xFF] ^
+                            lookup_2[(four >> 16) & 0xFF] ^
+                            lookup_3[(four >> 24) & 0xFF] ^
+                            lookup_4[three & 0xFF] ^
+                            lookup_5[(three >> 8) & 0xFF] ^
+                            lookup_6[(three >> 16) & 0xFF] ^
+                            lookup_7[(three >> 24) & 0xFF] ^
+                            lookup_8[two & 0xFF] ^
+                            lookup_9[(two >> 8) & 0xFF] ^
+                            lookup_10[(two >> 16) & 0xFF] ^
+                            lookup_11[(two >> 24) & 0xFF] ^
+                            lookup_12[one & 0xFF] ^
+                            lookup_13[(one >> 8) & 0xFF] ^
+                            lookup_14[(one >> 16) & 0xFF] ^
+                            lookup_15[(one >> 24) & 0xFF];
                     }
+                }
 
-                    // remaining 1 to 63 bytes (standard algorithm)
-                    int restBytes = count % bytesAtOnce;
-                    for (int i = (count / bytesAtOnce) * bytesAtOnce; i < count;)
-                    {
-                        crc = (crc >> 8) ^ lookup_0[(crc & 0xFF) ^ bytePtr[i++]];
-                    }
+                // remaining 1 to 63 bytes (standard algorithm)
+                int restBytes = count % bytesAtOnce;
+                for (int i = (count / bytesAtOnce) * bytesAtOnce; i < count;)
+                {
+                    crc = (crc >> 8) ^ lookup_0[(crc & 0xFF) ^ dataPtr[i++]];
                 }
             }
 
