@@ -14,7 +14,7 @@ It's faster than popular CRC Nuget packages 1.5-20 times</Description>
     <PackageProjectUrl>https://github.com/yubabich/FastCRC</PackageProjectUrl>
     <PackageTags>CRC, CRC32, Fast CRC</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
