@@ -34,6 +34,34 @@ namespace UnitTest
             Assert.AreEqual(textCRC32, crc);
         }
 
+        [TestMethod]
+        public void MemoryDataTest()
+        {
+            string dataFile = "CRC32Data.txt";
+            var testData = LoadTestData(dataFile);
+
+            Assert.AreEqual(1025, testData.Count);
+            for (int i = 0; i < testData.Count; ++i)
+            {
+                uint crc = CRC.Crc32(new Memory<byte>(testData[i].Item1));
+                Assert.AreEqual(testData[i].Item2, crc, $"Line {i}");
+            }
+        }
+
+        [TestMethod]
+        public void SpanDataTest()
+        {
+            string dataFile = "CRC32Data.txt";
+            var testData = LoadTestData(dataFile);
+
+            Assert.AreEqual(1025, testData.Count);
+            for (int i = 0; i < testData.Count; ++i)
+            {
+                uint crc = CRC.Crc32(new ReadOnlySpan<byte>(testData[i].Item1));
+                Assert.AreEqual(testData[i].Item2, crc, $"Line {i}");
+            }
+        }
+
         private static List<Tuple<byte[], uint>> LoadTestData(string dataFile)
         {
             var result = new List<Tuple<byte[], uint>>();
